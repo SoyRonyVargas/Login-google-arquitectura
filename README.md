@@ -13,6 +13,11 @@ Aplicación web full-stack para gestión de productos con:
 - Exportación de datos a Excel
 - Protección de rutas basada en roles
 
+![image](https://github.com/user-attachments/assets/153a1d3d-942f-4320-a09c-306793272ea0)
+![image](https://github.com/user-attachments/assets/b519434a-d165-4883-aea7-d89a98f18006)
+![image](https://github.com/user-attachments/assets/113f3276-e862-4e44-a46f-efbc5eb01ebf)
+
+
 ## ✨ Características
 
 ### 🔐 Autenticación
