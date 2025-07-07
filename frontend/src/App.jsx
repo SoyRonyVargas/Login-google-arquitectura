@@ -1,8 +1,9 @@
 import LoginPage from './pages/login';
 import './index.css';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
-import ProductsPage from './pages/ProductsPage';
+import { ProductsPage } from './pages/ProductsPage';
 import ProtectedRoute from './components/ProtectedRoute';
+import ProductEditForm from './pages/ProductPageEdit';
 
 function App() {
   return (
@@ -29,6 +30,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+         <Route path="/products/edit/:id" element={<ProductEditForm />} />
       </Routes>
     </Router>
   );

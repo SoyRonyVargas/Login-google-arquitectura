@@ -1,1 +1,7 @@
 node_modules/
+src/public/uploads/*.jpg
+src/public/uploads/*.jpeg
+src/public/uploads/*.gif
+src/public/uploads/*.avif
+src/public/uploads/*.png
+src/public/uploads/*.webp
