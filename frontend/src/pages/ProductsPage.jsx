@@ -139,7 +139,7 @@ const ProductsPage = () => {
                   Editar
                 </button>
                 <button
-                  onClick={() => navigate(`/products/${product.id}`)}
+                  onClick={() => navigate(`/product/${product.id}`)}
                   className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-medium py-1 px-3 rounded text-sm transition-colors"
                 >
                   Ver

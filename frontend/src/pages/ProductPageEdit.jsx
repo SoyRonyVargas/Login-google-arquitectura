@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 
 const BUCKET_NAME = 'arquitectura-software';
 const REGION = 'us-east-2';
@@ -25,6 +25,8 @@ const ProductEditForm = () => {
   });
   const [imagePreview, setImagePreview] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [videos, setVideos] = useState([]);
+  const [uploadingVideos, setUploadingVideos] = useState(false);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -44,6 +46,15 @@ const ProductEditForm = () => {
             descripcion: productData.descripcion || ''
           });
           setImagePreview(productData.imagen || '');
+          
+          // Inicializar videos si existen
+          if (productData.videos && Array.isArray(productData.videos)) {
+            setVideos(productData.videos.map(url => ({
+              url,
+              key: url.split('/').pop(),
+              name: url.split('/').pop()
+            })));
+          }
         } else {
           throw new Error('Producto no encontrado');
         }
@@ -75,6 +86,7 @@ const ProductEditForm = () => {
         reader.readAsArrayBuffer(file);
     });
   };
+
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -91,7 +103,7 @@ const ProductEditForm = () => {
       const command = new PutObjectCommand({
         Bucket: BUCKET_NAME,
         Key: key,
-        Body: new Uint8Array(arrayBuffer), // <-- aquí
+        Body: new Uint8Array(arrayBuffer),
         ContentType: file.type,
         ACL: 'public-read'
       });
@@ -112,9 +124,66 @@ const ProductEditForm = () => {
     }
   };
 
+  const handleVideoUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    
+    setUploadingVideos(true);
+    
+    try {
+      for (const file of files) {
+        try {
+          const arrayBuffer = await fileToArrayBuffer(file);
+          const fileName = `videos/${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
+          const key = fileName;
+
+          // Configurar el comando de subida a S3
+          const command = new PutObjectCommand({
+            Bucket: BUCKET_NAME,
+            Key: key,
+            Body: new Uint8Array(arrayBuffer),
+            ContentType: file.type,
+            ACL: 'public-read'
+          });
+
+          // Subir el archivo a S3
+          await s3Client.send(command);
+
+          // Construir la URL pública del video
+          const videoUrl = `https://${BUCKET_NAME}.s3.${REGION}.amazonaws.com/${key}`;
+
+          // Agregar el video a la lista
+          setVideos(prev => [...prev, {
+            url: videoUrl,
+            key: key,
+            name: file.name
+          }]);
+        } catch (err) {
+          setError('Error al subir el video: ' + file.name + ' - ' + err.message);
+        }
+      }
+    } catch (err) {
+      setError('Error al subir videos: ' + err.message);
+    } finally {
+      setUploadingVideos(false);
+    }
+  };
+
+  const removeVideo = async (videoKey) => {
+    try {
+      // Eliminar el video de la lista local
+      setVideos(prev => prev.filter(video => video.key !== videoKey));
+    } catch (err) {
+      setError('Error al eliminar el video: ' + err.message);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      // Preparar array de URLs de videos
+      const videoUrls = videos.map(video => video.url);
+      
       const response = await fetch(`http://localhost:3000/products/${id}`, {
         method: 'PUT',
         headers: {
@@ -122,7 +191,8 @@ const ProductEditForm = () => {
         },
         body: JSON.stringify({
           ...product,
-          ...formData
+          ...formData,
+          videos: videoUrls // Enviar el array de URLs de videos
         })
       });
 
@@ -263,6 +333,82 @@ const ProductEditForm = () => {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Sección para subir videos */}
+          <div className="mb-6">
+            <label className="block text-gray-700 text-sm font-bold mb-2">
+              Videos del Producto
+            </label>
+            
+            <div className="mb-4">
+              <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="video-upload">
+                Subir videos
+              </label>
+              <div className="flex items-center">
+                <input
+                  id="video-upload"
+                  name="video-upload"
+                  type="file"
+                  accept="video/*"
+                  multiple
+                  onChange={handleVideoUpload}
+                  className="sr-only"
+                />
+                <label
+                  htmlFor="video-upload"
+                  className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none"
+                >
+                  <span className="bg-blue-100 hover:bg-blue-200 text-blue-700 font-medium py-2 px-4 rounded-lg flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    Seleccionar videos
+                  </span>
+                </label>
+                <p className="ml-4 text-sm text-gray-500">MP4, MOV hasta 50MB cada uno</p>
+              </div>
+              {uploadingVideos && (
+                <div className="mt-2 text-blue-600 flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-blue-500 mr-2"></div>
+                  Subiendo videos...
+                </div>
+              )}
+            </div>
+            
+            {/* Lista de videos */}
+            <div className="mt-4">
+              <p className="text-sm text-gray-600 mb-2 font-medium">Videos subidos:</p>
+              <div className="space-y-3">
+                {videos.length === 0 ? (
+                  <p className="text-gray-500 italic">No hay videos subidos</p>
+                ) : (
+                  videos.map((video) => (
+                    <div key={video.key} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-200">
+                      <div className="flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-500 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        <div>
+                          <p className="text-sm font-medium text-gray-700 truncate max-w-xs">{video.name}</p>
+                          <p className="text-xs text-gray-500 truncate max-w-xs">{video.url}</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeVideo(video.key)}
+                        className="text-red-500 hover:text-red-700 ml-2"
+                        title="Eliminar video"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
 
           <div className="mb-6">
